@@ -119,44 +119,23 @@ class MemberRegisterView(views.APIView):
         serializer = MemberSerializer(data=data)
         if serializer.is_valid():
             member = serializer.save()
-            
-            # Check Voter Register with enhanced matching
-            matched_record = None
 
-            # Direct match first
-            direct = VoterRecord.objects.filter(
-                Q(id_number=member.national_id) | Q(phone_number=member.phone)
-            ).first()
-            if direct:
-                matched_record = direct
+            # Voter Verification: match full_name + year of birth against voter register
+            is_verified = False
+            if member.yob:
+                name_parts = [p for p in member.full_name.upper().split() if len(p) > 2]
+                # Get candidates with matching DOB year first (much smaller set)
+                candidates = VoterRecord.objects.filter(date_of_birth=member.yob)
+                for record in candidates:
+                    record_name_upper = record.full_name.upper()
+                    matched_parts = sum(1 for part in name_parts if part in record_name_upper)
+                    # Require at least 2 name parts to match (e.g. first + last name)
+                    if matched_parts >= 2:
+                        is_verified = True
+                        break
 
-            if not matched_record:
-                # Try masked ID matching
-                id_len = len(member.national_id)
-                if id_len >= 5:
-                    id_pattern = f"{member.national_id[0]}{'*' * (id_len - 2)}{member.national_id[-1]}"
-                    name_parts = [p for p in member.full_name.upper().split(' ') if len(p) > 2]
-                    potential_matches = list(VoterRecord.objects.filter(id_number=id_pattern))
-
-                    # Pass 1: 2+ name parts
-                    for record in potential_matches:
-                        record_name_upper = record.full_name.upper()
-                        if sum(1 for part in name_parts if part in record_name_upper) >= 2:
-                            matched_record = record
-                            break
-
-                    # Pass 2: 1 name part fallback
-                    if not matched_record:
-                        for record in potential_matches:
-                            record_name_upper = record.full_name.upper()
-                            if sum(1 for part in name_parts if part in record_name_upper) >= 1:
-                                matched_record = record
-                                break
-
-            if matched_record:
+            if is_verified:
                 member.is_voter_verified = True
-                member.official_ward = matched_record.ward or ''
-                member.official_polling_station = matched_record.polling_station or ''
                 member.save()
 
             token, _ = Token.objects.get_or_create(user=member)
@@ -165,6 +144,7 @@ class MemberRegisterView(views.APIView):
                 "member": serializer.data
             }, status=status.HTTP_201_CREATED)
         return response.Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
 
 class MemberMeView(views.APIView):
     permission_classes = [IsAuthenticated]

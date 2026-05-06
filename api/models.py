@@ -60,6 +60,7 @@ class VoterRecord(models.Model):
     id_number = models.CharField(max_length=20, null=True, blank=True, db_index=True)
     phone_number = models.CharField(max_length=20, null=True, blank=True, db_index=True)
     full_name = models.CharField(max_length=255, db_index=True)
+    date_of_birth = models.IntegerField(null=True, blank=True, db_index=True)  # year only e.g. 1994
     ward = models.CharField(max_length=255, blank=True, null=True, db_index=True)
     polling_station = models.CharField(max_length=255, blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)

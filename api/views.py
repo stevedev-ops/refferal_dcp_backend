@@ -85,10 +85,20 @@ class MemberRegisterView(views.APIView):
         data['is_staff'] = False
         data['is_superuser'] = False
 
-        # 1. Quota Check
+        # 1. Quota & Depth Check
         if referrer_id and not invite_token:
             try:
                 referrer = Member.objects.get(id=referrer_id)
+                
+                # Depth Check (Limit to 3 levels: Root -> L1 -> L2)
+                # If referrer has a referrer (L1), and THAT person also has a referrer (L0), 
+                # then the referrer is at L2 and cannot invite anyone else.
+                if referrer.referred_by is not None and referrer.referred_by.referred_by is not None:
+                    return response.Response(
+                        {"error": "Maximum recruitment depth reached. Level 2 members cannot invite others."},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+
                 quota = 25 if referrer.referred_by is None else 5
                 current_count = referrer.recruits.count()
                 if current_count >= quota:

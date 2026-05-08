@@ -148,6 +148,9 @@ class MemberRegisterView(views.APIView):
 
             if is_verified:
                 member.is_voter_verified = True
+                # Store official IEBC data
+                member.official_ward = record.ward
+                member.official_polling_station = record.polling_station
                 member.save()
 
             token, _ = Token.objects.get_or_create(user=member)

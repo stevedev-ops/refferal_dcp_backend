@@ -10,6 +10,7 @@ urlpatterns = [
 
     path('members', views.MemberListView.as_view(), name='member-list'),
     path('members/<int:pk>', views.MemberDetailView.as_view(), name='member-detail'),
+    path('members/<int:pk>/export', views.MemberDownlineExportView.as_view(), name='member-export'),
     path('stats', views.SystemStatsView.as_view(), name='stats'),
     path('stats/reports', views.ReportStatsView.as_view(), name='report-stats'),
     path('invites', views.InviteCreateView.as_view(), name='invite-create'),

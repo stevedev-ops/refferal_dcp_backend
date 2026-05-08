@@ -1,3 +1,5 @@
+import csv
+from django.http import HttpResponse
 from rest_framework import status, views, response, generics
 from rest_framework.pagination import PageNumberPagination
 from django.db.models import Count, Q
@@ -210,6 +212,11 @@ class MemberListView(generics.ListCreateAPIView):
             else:
                 queryset = queryset.filter(referred_by=referred_by)
 
+        downline_of = self.request.query_params.get('downline_of')
+        if downline_of:
+            downline_ids, _ = get_recursive_downline(downline_of)
+            queryset = queryset.filter(id__in=downline_ids)
+
         # ALWAYS filter out admins and staff from the public member lists
         queryset = queryset.filter(is_admin=False, is_staff=False)
 
@@ -364,3 +371,59 @@ class InviteDetailView(generics.RetrieveAPIView):
     queryset = Invite.objects.all()
     serializer_class = InviteSerializer
     lookup_field = 'id'
+
+class MemberDownlineExportView(views.APIView):
+    permission_classes = [IsAdminUser]
+    
+    def get(self, request, pk):
+        status_filter = request.query_params.get('status', 'all')
+        try:
+            root_member = Member.objects.get(pk=pk)
+        except Member.DoesNotExist:
+            return response.Response({"error": "Member not found"}, status=status.HTTP_404_NOT_FOUND)
+            
+        response_csv = HttpResponse(content_type='text/csv')
+        filename = f"downline_{status_filter}_{root_member.full_name.replace(' ', '_')}.csv"
+        response_csv['Content-Disposition'] = f'attachment; filename="{filename}"'
+        
+        writer = csv.writer(response_csv)
+        writer.writerow(['Level', 'Full Name', 'Phone', 'National ID', 'Ward', 'Polling Station', 'Verified?', 'Recruited By', 'Date Joined'])
+        
+        # DFS traversal for hierarchical structure
+        stack = [(root_member, 0, "ROOT")]
+        seen = {root_member.id}
+        
+        while stack:
+            curr, depth, recruiter_name = stack.pop()
+            
+            # Check if current member should be included in CSV
+            is_root = curr.id == root_member.id
+            should_include = True
+            if status_filter == 'verified' and not curr.is_voter_verified and not is_root:
+                should_include = False
+            elif status_filter == 'unverified' and curr.is_voter_verified and not is_root:
+                should_include = False
+
+            if should_include:
+                prefix = "  " * depth + ("↳ " if depth > 0 else "")
+                writer.writerow([
+                    depth,
+                    f"{prefix}{curr.full_name}",
+                    curr.phone,
+                    curr.national_id,
+                    curr.ward,
+                    curr.polling_station,
+                    "YES" if curr.is_voter_verified else "NO",
+                    recruiter_name,
+                    curr.created_at.strftime('%Y-%m-%d')
+                ])
+            
+            if depth < 15:
+                # Get recruits in reverse order to maintain correct DFS order when popping
+                recruits = Member.objects.filter(referred_by=curr).order_by('-created_at')
+                for r in recruits:
+                    if r.id not in seen:
+                        seen.add(r.id)
+                        stack.append((r, depth + 1, curr.full_name))
+                        
+        return response_csv

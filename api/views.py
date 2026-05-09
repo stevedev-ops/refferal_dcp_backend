@@ -157,7 +157,7 @@ class MemberRegisterView(views.APIView):
             token, _ = Token.objects.get_or_create(user=member)
             return response.Response({
                 "token": token.key,
-                "member": serializer.data
+                "member": MemberSerializer(member).data
             }, status=status.HTTP_201_CREATED)
         return response.Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 

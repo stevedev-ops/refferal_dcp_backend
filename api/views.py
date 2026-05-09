@@ -138,20 +138,21 @@ class MemberRegisterView(views.APIView):
                 name_parts = [p for p in member.full_name.upper().split() if len(p) > 2]
                 # Get candidates with matching DOB year first (much smaller set)
                 candidates = VoterRecord.objects.filter(date_of_birth=member.yob)
+                import re
                 for record in candidates:
                     record_name_upper = record.full_name.upper()
-                    matched_parts = sum(1 for part in name_parts if part in record_name_upper)
-                    # Require at least 2 name parts to match (e.g. first + last name)
+                    record_words = set(re.split(r'[-\s]+', record_name_upper))
+                    matched_parts = sum(1 for part in name_parts if part in record_words)
+                    
+                    # Require at least 2 full name parts to match exactly
                     if matched_parts >= 2:
                         is_verified = True
+                        member.is_voter_verified = True
+                        # Store official IEBC data
+                        member.official_ward = record.ward
+                        member.official_polling_station = record.polling_station
+                        member.save()
                         break
-
-            if is_verified:
-                member.is_voter_verified = True
-                # Store official IEBC data
-                member.official_ward = record.ward
-                member.official_polling_station = record.polling_station
-                member.save()
 
             token, _ = Token.objects.get_or_create(user=member)
             return response.Response({
@@ -306,11 +307,21 @@ class VoterRecordListView(generics.ListAPIView):
         queryset = super().get_queryset()
         search = self.request.query_params.get('search')
         if search:
-            queryset = queryset.filter(
-                Q(full_name__icontains=search) | 
-                Q(id_number__icontains=search) | 
-                Q(phone_number__icontains=search)
-            )
+            search_parts = [p.strip() for p in search.split() if len(p.strip()) > 1]
+            if search_parts:
+                query = Q()
+                for part in search_parts:
+                    query &= Q(full_name__icontains=part)
+                
+                # Also allow searching by ID or phone if only one part is provided
+                if len(search_parts) == 1:
+                    query |= Q(id_number__icontains=search) | Q(phone_number__icontains=search)
+                
+                queryset = queryset.filter(query)
+            else:
+                queryset = queryset.filter(
+                    Q(id_number__icontains=search) | Q(phone_number__icontains=search)
+                )
         
         ward = self.request.query_params.get('ward')
         if ward:

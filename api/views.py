@@ -240,9 +240,19 @@ class MemberListView(generics.ListCreateAPIView):
         
         search = self.request.query_params.get('search')
         if search:
-            queryset = queryset.filter(
-                Q(full_name__icontains=search) | Q(national_id__icontains=search)
-            )
+            search_parts = [p.strip() for p in search.split() if len(p.strip()) > 1]
+            if search_parts:
+                query = Q()
+                for part in search_parts:
+                    query &= Q(full_name__icontains=part)
+                
+                # Allow searching by ID if only one part is provided
+                if len(search_parts) == 1:
+                    query |= Q(national_id__icontains=search)
+                
+                queryset = queryset.filter(query)
+            else:
+                queryset = queryset.filter(national_id__icontains=search)
         
         ward = self.request.query_params.get('ward')
         if ward:

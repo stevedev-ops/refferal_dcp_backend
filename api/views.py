@@ -258,7 +258,7 @@ class MemberListView(generics.ListCreateAPIView):
         if ward:
             queryset = queryset.filter(ward__iexact=ward)
         
-        voter_status = self.request.query_params.get('voter_status')
+        voter_status = self.request.query_params.get('voter_status', '').lower()
         if voter_status == 'verified':
             queryset = queryset.filter(is_voter_verified=True)
         elif voter_status == 'unverified':

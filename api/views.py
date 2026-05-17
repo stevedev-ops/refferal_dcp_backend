@@ -75,9 +75,25 @@ class MemberLoginView(views.APIView):
             })
         except Exception as e:
             import traceback
+            from django.db import connection
+            
+            db_columns = []
+            applied_migrations = []
+            try:
+                with connection.cursor() as cursor:
+                    cursor.execute("SELECT column_name FROM information_schema.columns WHERE table_name='api_member'")
+                    db_columns = [row[0] for row in cursor.fetchall()]
+                    
+                    cursor.execute("SELECT app, name, applied FROM django_migrations WHERE app='api'")
+                    applied_migrations = [f"{row[0]}.{row[1]} at {row[2]}" for row in cursor.fetchall()]
+            except Exception as db_err:
+                db_columns = [f"Error: {str(db_err)}"]
+
             return response.Response({
                 "error": "Debugging 500 error",
                 "exception": str(e),
+                "db_columns": db_columns,
+                "applied_migrations": applied_migrations,
                 "traceback": traceback.format_exc()
             }, status=500)
 

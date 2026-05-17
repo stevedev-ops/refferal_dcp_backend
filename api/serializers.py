@@ -9,7 +9,7 @@ class MemberSerializer(serializers.ModelSerializer):
     class Meta:
         model = Member
         fields = [
-            'id', 'full_name', 'phone', 'national_id', 'email', 'yob',
+            'id', 'full_name', 'phone', 'national_id', 'email', 'gender', 'yob',
             'ward', 'polling_station',
             'official_ward', 'official_polling_station',
             'referral_code', 'referred_by', 'is_voter_verified', 'created_at',

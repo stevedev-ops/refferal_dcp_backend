@@ -25,6 +25,12 @@ class Member(AbstractBaseUser, PermissionsMixin):
     phone = models.CharField(max_length=20, unique=True)
     national_id = models.CharField(max_length=20, unique=True)
     email = models.EmailField(blank=True, null=True)
+    gender = models.CharField(
+        max_length=10, 
+        blank=True, 
+        null=True, 
+        choices=[('Male', 'Male'), ('Female', 'Female')]
+    )
     yob = models.IntegerField(null=True, blank=True)
     ward = models.CharField(max_length=255, blank=True, null=True)
     polling_station = models.CharField(max_length=255, blank=True, null=True)

@@ -47,31 +47,39 @@ class MemberLoginView(views.APIView):
     permission_classes = [AllowAny]
     throttle_classes = [LoginThrottle]
     def post(self, request):
-        first_name = request.data.get('firstName', '').strip()
-        national_id = request.data.get('nationalId', '').strip()
+        try:
+            first_name = request.data.get('firstName', '').strip()
+            national_id = request.data.get('nationalId', '').strip()
 
-        if not first_name or not national_id:
-            return response.Response(
-                {"error": "First name and National ID are required."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            if not first_name or not national_id:
+                return response.Response(
+                    {"error": "First name and National ID are required."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
 
-        member = Member.objects.filter(
-            national_id=national_id,
-            full_name__istartswith=first_name
-        ).first()
+            member = Member.objects.filter(
+                national_id=national_id,
+                full_name__istartswith=first_name
+            ).first()
 
-        if not member:
-            return response.Response(
-                {"error": "No member found with that First Name and ID combination."},
-                status=status.HTTP_404_NOT_FOUND
-            )
+            if not member:
+                return response.Response(
+                    {"error": "No member found with that First Name and ID combination."},
+                    status=status.HTTP_404_NOT_FOUND
+                )
 
-        token, _ = Token.objects.get_or_create(user=member)
-        return response.Response({
-            "token": token.key,
-            "member": MemberSerializer(member).data
-        })
+            token, _ = Token.objects.get_or_create(user=member)
+            return response.Response({
+                "token": token.key,
+                "member": MemberSerializer(member).data
+            })
+        except Exception as e:
+            import traceback
+            return response.Response({
+                "error": "Debugging 500 error",
+                "exception": str(e),
+                "traceback": traceback.format_exc()
+            }, status=500)
 
 class MemberRegisterView(views.APIView):
     permission_classes = [AllowAny]
